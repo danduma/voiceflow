@@ -102,3 +102,5 @@ Set the `VITE_OPENAI_API_KEY` environment variable for OpenAI fallback.
 ## License
 
 MIT
+
+
