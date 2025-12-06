@@ -13,6 +13,7 @@ export function useVoiceTranscription(options: UseVoiceTranscriptionOptions = {}
   const voiceServiceRef = useRef<VoiceInputService | null>(null)
   const animationFrameRef = useRef<number | undefined>(undefined)
   const isCancelledRef = useRef(false);
+  const processedRef = useRef<string>('') // last text we already emitted to consumers (for delta mode)
 
   const startRecording = useCallback(async () => {
     try {
@@ -21,7 +22,14 @@ export function useVoiceTranscription(options: UseVoiceTranscriptionOptions = {}
       setTranscription('')
       setInterimTranscription('')
       isCancelledRef.current = false;
-      
+      // Initialize baseline for delta mode from consumer if provided
+      if (options.emitMode === 'delta' && options.getBaselineText) {
+        const baseline = options.getBaselineText()?.trim()
+        if (baseline) {
+          processedRef.current = baseline
+        }
+      }
+
       // Clean up existing voice service if any
       if (voiceServiceRef.current) {
         try {
@@ -38,24 +46,32 @@ export function useVoiceTranscription(options: UseVoiceTranscriptionOptions = {}
       await voiceServiceRef.current.startRecording((text: string, isFinal: boolean) => {
         if (isCancelledRef.current) return;
         console.log('Transcription callback:', { text, isFinal, length: text.length })
+        const newText = text
+        const prev = processedRef.current
+        const emitMode = options.emitMode ?? 'full'
+        const delta = emitMode === 'delta'
+          ? (newText.startsWith(prev) ? newText.slice(prev.length) : newText)
+          : newText
         
         if (isFinal) {
           console.log('Final transcription received:', text)
-          // Set the final transcription to the new text (don't concatenate)
-          const newText = text.trim()
           setTranscription(newText)
           setInterimTranscription('')
           
-          // Call the optional callback
-          options.onTranscriptionUpdate?.(newText, true)
+          if (delta) {
+            options.onTranscriptionUpdate?.(delta, true)
+          }
+          processedRef.current = emitMode === 'delta' ? newText : processedRef.current
         } else {
           console.log('Interim transcription received:', text)
-          // Set the interim transcription to the new text (don't concatenate)
-          const newText = text.trim()
           setInterimTranscription(newText)
           
-          // Call the optional callback
-          options.onTranscriptionUpdate?.(newText, false)
+          if (delta) {
+            options.onTranscriptionUpdate?.(delta, false)
+          }
+          if (emitMode === 'delta') {
+            processedRef.current = newText
+          }
         }
       })
 

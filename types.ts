@@ -40,6 +40,9 @@ export interface TextareaWithVoiceProps {
 
   // Voice button positioning
   buttonPosition?: 'top-right' | 'bottom-right'
+
+  // How transcriptions are applied to the value
+  transcriptionMode?: 'replace' | 'append'
 }
 
 // Hook interfaces
@@ -48,6 +51,8 @@ export interface UseVoiceTranscriptionOptions {
   onTranscriptionUpdate?: (text: string, isFinal: boolean) => void
   onError?: (error: string) => void
   onVisualizationUpdate?: (levels: number[]) => void
+  emitMode?: 'full' | 'delta'
+  getBaselineText?: () => string
 }
 
 export interface UseVoiceTranscriptionReturn {
