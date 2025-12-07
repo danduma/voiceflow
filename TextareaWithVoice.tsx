@@ -3,6 +3,15 @@ import { useState, useRef, useCallback } from 'react'
 import { useVoiceTranscription } from './useVoiceTranscription'
 import type { TextareaWithVoiceProps } from './types'
 
+const getCommonPrefixLength = (a: string, b: string) => {
+  const limit = Math.min(a.length, b.length)
+  let idx = 0
+  while (idx < limit && a[idx] === b[idx]) {
+    idx++
+  }
+  return idx
+}
+
 export default function TextareaWithVoice({
   value,
   onChange,
@@ -59,11 +68,24 @@ export default function TextareaWithVoice({
       const selectionStart = textarea?.selectionStart ?? baseValue.length
       const selectionEnd = textarea?.selectionEnd ?? baseValue.length
 
-      // Compute delta relative to last final transcript to avoid re-appending history
+      // Compute delta relative to last final transcript and handle corrections mid-stream
       const prior = lastTranscriptRef.current
-      const delta = prior && raw.startsWith(prior)
-        ? raw.slice(prior.length).trimStart()
-        : raw
+      const commonPrefixLength = getCommonPrefixLength(prior, raw)
+      const hasCorrection = commonPrefixLength < prior.length
+
+      if (hasCorrection) {
+        const stablePrefix = prior.slice(0, commonPrefixLength)
+        if (baseValue.endsWith(prior)) {
+          baseValue = `${baseValue.slice(0, baseValue.length - prior.length)}${stablePrefix}`
+        } else if (baseValue.endsWith(stablePrefix)) {
+          baseValue = `${baseValue.slice(0, baseValue.length - stablePrefix.length)}${stablePrefix}`
+        } else {
+          // Fallback to the stable portion only to avoid duplicating corrected words
+          baseValue = stablePrefix
+        }
+      }
+
+      const delta = raw.slice(commonPrefixLength).trimStart()
       if (!delta) {
         if (isFinal) {
           resetInterim()
