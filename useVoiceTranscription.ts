@@ -14,6 +14,9 @@ export function useVoiceTranscription(options: UseVoiceTranscriptionOptions = {}
   const animationFrameRef = useRef<number | undefined>(undefined)
   const isCancelledRef = useRef(false);
   const processedRef = useRef<string>('') // last text we already emitted to consumers (for delta mode)
+  
+  // NEW: Track full transcription history to reconstruct full text from segments
+  const transcriptionHistoryRef = useRef<string>('')
 
   const startRecording = useCallback(async () => {
     try {
@@ -21,6 +24,7 @@ export function useVoiceTranscription(options: UseVoiceTranscriptionOptions = {}
       setPermissionDenied(false)
       setTranscription('')
       setInterimTranscription('')
+      transcriptionHistoryRef.current = ''
       isCancelledRef.current = false;
       // Initialize baseline for delta mode from consumer if provided
       if (options.emitMode === 'delta' && options.getBaselineText) {
@@ -45,32 +49,69 @@ export function useVoiceTranscription(options: UseVoiceTranscriptionOptions = {}
 
       await voiceServiceRef.current.startRecording((text: string, isFinal: boolean) => {
         if (isCancelledRef.current) return;
-        console.log('Transcription callback:', { text, isFinal, length: text.length })
-        const newText = text
-        const prev = processedRef.current
+        
+        // 'text' is now a SEGMENT (interim or final) from voiceInput
+        
+        // Reconstruct full text for backward compatibility and 'full' mode
+        let currentFullText = transcriptionHistoryRef.current
+        const separator = currentFullText.length > 0 && !currentFullText.endsWith(' ') && !text.startsWith(' ') ? ' ' : ''
+        
+        // The effective full text if we append the current segment
+        const effectiveFullText = currentFullText + separator + text
+        
+        console.log('Transcription callback:', { segment: text, full: effectiveFullText, isFinal })
+
         const emitMode = options.emitMode ?? 'full'
+        let textToEmit = effectiveFullText
+        
+        if (emitMode === 'segment') {
+            textToEmit = separator + text // Pass the segment directly, prepending separator if needed for continuity
+        }
+
+        // Logic for delta mode (legacy support, but might be flaky with segments)
+        // If emitMode is delta, we compare textToEmit (which is FULL TEXT) with processedRef (PREV FULL TEXT)
+        const prev = processedRef.current
         const delta = emitMode === 'delta'
-          ? (newText.startsWith(prev) ? newText.slice(prev.length) : newText)
-          : newText
+          ? (textToEmit.startsWith(prev) ? textToEmit.slice(prev.length) : textToEmit)
+          : textToEmit
         
         if (isFinal) {
-          console.log('Final transcription received:', text)
-          setTranscription(newText)
+          console.log('Final transcription segment:', text)
+          
+          // Update history
+          transcriptionHistoryRef.current += separator + text
+          
+          setTranscription(transcriptionHistoryRef.current)
           setInterimTranscription('')
           
-          if (delta) {
-            options.onTranscriptionUpdate?.(delta, true)
+          if (emitMode === 'segment') {
+             options.onTranscriptionUpdate?.(textToEmit, true)
+          } else if (delta) {
+             options.onTranscriptionUpdate?.(delta, true)
           }
-          processedRef.current = emitMode === 'delta' ? newText : processedRef.current
-        } else {
-          console.log('Interim transcription received:', text)
-          setInterimTranscription(newText)
           
-          if (delta) {
-            options.onTranscriptionUpdate?.(delta, false)
-          }
+          // Update processedRef
           if (emitMode === 'delta') {
-            processedRef.current = newText
+             processedRef.current = textToEmit
+          } else if (emitMode === 'segment') {
+             // For segment mode, we don't really track history in processedRef the same way
+             processedRef.current = '' 
+          } else {
+             processedRef.current = textToEmit
+          }
+          
+        } else {
+          console.log('Interim transcription segment:', text)
+          setInterimTranscription(text)
+          
+          if (emitMode === 'segment') {
+             options.onTranscriptionUpdate?.(textToEmit, false)
+          } else if (delta) {
+             options.onTranscriptionUpdate?.(delta, false)
+          }
+          
+          if (emitMode === 'delta') {
+            processedRef.current = textToEmit
           }
         }
       })

@@ -51,7 +51,7 @@ export interface UseVoiceTranscriptionOptions {
   onTranscriptionUpdate?: (text: string, isFinal: boolean) => void
   onError?: (error: string) => void
   onVisualizationUpdate?: (levels: number[]) => void
-  emitMode?: 'full' | 'delta'
+  emitMode?: 'full' | 'delta' | 'segment'
   getBaselineText?: () => string
 }
 

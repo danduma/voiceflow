@@ -418,7 +418,7 @@ export class OpenAIVoiceInputService implements VoiceInputService {
 export class BrowserVoiceInputService implements VoiceInputService {
   private recognition: any = null
   private isCurrentlyRecording = false
-  private fullTranscript = ''
+  private fullTranscript = '' // Keep for fallback/debugging if needed, but we won't emit it cumulatively by default
   private audioContext: AudioContext | null = null
   private analyser: AnalyserNode | null = null
   private dataArray: Uint8Array | null = null
@@ -540,17 +540,21 @@ export class BrowserVoiceInputService implements VoiceInputService {
         }
       }
 
-      // Always send interim results first if available (shows words as they come)
+      // Send interim results (shows words as they come)
       if (interimTranscript) {
         console.log('Browser speech recognition - interim:', interimTranscript)
-        onTranscription(this.fullTranscript + interimTranscript, false)
+        onTranscription(interimTranscript, false)
       }
 
       // Then send final results if available
       if (finalTranscript) {
-        this.fullTranscript += finalTranscript
+        // Update internal full transcript just in case
+        const needsSpace = this.fullTranscript.length > 0 && !this.fullTranscript.endsWith(' ') && !finalTranscript.startsWith(' ')
+        this.fullTranscript += (needsSpace ? ' ' : '') + finalTranscript
+        
         console.log('Browser speech recognition - final:', finalTranscript)
-        onTranscription(this.fullTranscript, true)
+        // Emit only the new final segment
+        onTranscription(finalTranscript, true)
       }
     }
 
