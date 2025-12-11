@@ -57,7 +57,7 @@ export class OpenAIVoiceInputService implements VoiceInputService {
   private audioStream: MediaStream | null = null
   private audioContext: AudioContext | null = null
   private analyser: AnalyserNode | null = null
-  private dataArray: Uint8Array | null = null
+  private dataArray: Uint8Array<ArrayBuffer> | null = null
   private isCurrentlyRecording = false
   private onTranscriptionCallback: ((text: string, isFinal: boolean) => void) | null = null
   private finalTranscription = ''
@@ -115,7 +115,7 @@ export class OpenAIVoiceInputService implements VoiceInputService {
       source.connect(this.analyser)
       
       const bufferLength = this.analyser.frequencyBinCount
-      this.dataArray = new Uint8Array(bufferLength)
+      this.dataArray = new Uint8Array(bufferLength) as Uint8Array<ArrayBuffer>
 
       // Setup MediaRecorder for audio chunks - use OpenAI compatible formats
       let mimeType = 'audio/webm' // WebM is widely supported by OpenAI
@@ -421,7 +421,7 @@ export class BrowserVoiceInputService implements VoiceInputService {
   private fullTranscript = '' // Keep for fallback/debugging if needed, but we won't emit it cumulatively by default
   private audioContext: AudioContext | null = null
   private analyser: AnalyserNode | null = null
-  private dataArray: Uint8Array | null = null
+  private dataArray: Uint8Array<ArrayBuffer> | null = null
   private audioStream: MediaStream | null = null
   private restartCount = 0
   private maxRestarts = 10
@@ -510,7 +510,7 @@ export class BrowserVoiceInputService implements VoiceInputService {
       source.connect(this.analyser)
       
       const bufferLength = this.analyser.frequencyBinCount
-      this.dataArray = new Uint8Array(bufferLength)
+      this.dataArray = new Uint8Array(bufferLength) as Uint8Array<ArrayBuffer>
     } catch (error) {
       console.warn('Failed to setup audio visualization for browser speech recognition:', error)
     }
