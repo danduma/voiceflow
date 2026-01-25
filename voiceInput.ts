@@ -61,7 +61,7 @@ export class OpenAIVoiceInputService implements VoiceInputService {
   private isCurrentlyRecording = false
   private onTranscriptionCallback: ((text: string, isFinal: boolean) => void) | null = null
   private finalTranscription = ''
-  private transcriptionDebounceTimer: NodeJS.Timeout | null = null
+  private transcriptionDebounceTimer: any | null = null
   private lastTranscriptionTime = 0
   private processedTranscriptions = new Set<string>()
   private language: string | 'auto' = 'auto'
