@@ -192,67 +192,10 @@ export class OpenAIVoiceInputService implements VoiceInputService {
 
   private async tryOpenAITranscription(audioBlob: Blob): Promise<void> {
     try {
-      const formData = new FormData()
-      // Determine file extension based on MIME type
-      let extension = 'webm'
-      if (audioBlob.type.includes('mp4')) {
-        extension = 'mp4'
-      } else if (audioBlob.type.includes('wav')) {
-        extension = 'wav'
-      }
-      
-      formData.append('file', audioBlob, `audio.${extension}`)
-      formData.append('model', 'whisper-1')
-      
-      // Add language parameter if specified (skip for auto-detection)
-      const languageCode = this.getOpenAILanguageCode()
-      if (languageCode) {
-        formData.append('language', languageCode)
-        console.log('Using OpenAI language:', languageCode)
-      } else {
-        console.log('Using OpenAI auto-detection')
-      }
-      
-      formData.append('response_format', 'text')
-      
-      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`
-        },
-        body: formData
+      console.warn('Server transcription is not configured for the Next.js runtime.', {
+        size: audioBlob.size,
+        type: audioBlob.type,
       })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`OpenAI API error (${response.status}):`, errorText)
-        console.error('Failed audio blob details:', {
-          size: audioBlob.size,
-          type: audioBlob.type,
-          extension: extension,
-          language: languageCode || 'auto'
-        })
-        return
-      }
-      
-      const transcript = await response.text()
-      if (transcript && transcript.trim()) {
-        console.log('Transcription received:', transcript)
-        
-        // Check if we've already processed this exact transcription
-        if (this.processedTranscriptions.has(transcript)) {
-          console.log('Skipping duplicate transcription:', transcript)
-          return
-        }
-        
-        // Add to processed set
-        this.processedTranscriptions.add(transcript)
-        
-        // Update with the latest transcription
-        this.onTranscriptionCallback?.(transcript, false)
-        this.finalTranscription = transcript
-        console.log('Updated transcription:', transcript)
-      }
     } catch (error) {
       console.error('Error in OpenAI transcription:', error)
     }
@@ -772,8 +715,7 @@ export function createVoiceInputService(language: string | 'auto' = 'auto'): Voi
   console.log('🎤 Creating voice input service with language:', language)
   console.log('🎤 Browser support check:', {
     webkitSpeechRecognition: 'webkitSpeechRecognition' in window,
-    SpeechRecognition: 'SpeechRecognition' in window,
-    hasOpenAIKey: !!import.meta.env.VITE_OPENAI_API_KEY
+    SpeechRecognition: 'SpeechRecognition' in window
   })
   
   // Check if browser supports speech recognition first (free and real-time!)
@@ -784,14 +726,5 @@ export function createVoiceInputService(language: string | 'auto' = 'auto'): Voi
     return service
   }
   
-  // Fall back to OpenAI if browser doesn't support speech recognition
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY
-  if (apiKey) {
-    console.warn('⚠️ Browser speech recognition not available, falling back to OpenAI Whisper (paid, no real-time interim results)')
-    const service = new OpenAIVoiceInputService(apiKey)
-    service.setLanguage(language)
-    return service
-  } else {
-    throw new Error('❌ No speech recognition available: Browser does not support speech recognition and no OpenAI API key provided')
-  }
+  throw new Error('No speech recognition available: this browser does not support SpeechRecognition.')
 }
